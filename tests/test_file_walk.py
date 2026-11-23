@@ -43,6 +43,36 @@ def test_inverted_gitignore_keeps_source_directories_traversable(tmp_path: Path)
     assert included == {"Root.cpp", "Engine/Source/kept.cpp", "Engine/Source/kept.h"}
 
 
+def test_respect_gitignore_false_skips_root_and_nested_gitignore(tmp_path: Path) -> None:
+    """With respect_gitignore off, no .gitignore drops files, but the include and
+    exclude patterns still apply."""
+    files = {
+        ".gitignore": "venv/\ngenerated.py\n",
+        "app.py": "x = 1\n",
+        "generated.py": "x = 2\n",
+        "venv/lib/site.py": "x = 3\n",
+        "pkg/.gitignore": "local.py\n",
+        "pkg/local.py": "x = 4\n",
+        "pkg/excluded.py": "x = 5\n",
+    }
+    for relative_path, contents in files.items():
+        path = tmp_path / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents)
+
+    def walked(matcher: FilePathMatcher) -> set[str]:
+        return {rel.as_posix() for _abs, rel in iter_included_files(tmp_path, tmp_path, matcher)}
+
+    included, excluded = ["**/*.py"], ["**/excluded.py"]
+    assert walked(build_matcher(tmp_path, included, excluded)) == {"app.py"}
+    assert walked(build_matcher(tmp_path, included, excluded, respect_gitignore=False)) == {
+        "app.py",
+        "generated.py",
+        "venv/lib/site.py",
+        "pkg/local.py",
+    }
+
+
 def test_max_file_size_excludes_large_files(tmp_path: Path) -> None:
     """A size cap drops oversized files while leaving the rest of the walk intact."""
     (tmp_path / "small.py").write_text("x = 1\n")

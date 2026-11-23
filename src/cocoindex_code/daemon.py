@@ -464,7 +464,12 @@ async def _check_file_walk(project_root_str: str) -> DoctorCheckResult:
     except FileNotFoundError as e:
         return DoctorCheckResult(name="File Walk", ok=False, details=[], errors=[str(e)])
 
-    matcher = build_matcher(project_root, ps.include_patterns, ps.exclude_patterns)
+    matcher = build_matcher(
+        project_root,
+        ps.include_patterns,
+        ps.exclude_patterns,
+        respect_gitignore=ps.respect_gitignore,
+    )
 
     counts_by_ext: dict[str, int] = {}
     gitignore_dirs: list[str] = []
@@ -479,7 +484,7 @@ async def _check_file_walk(project_root_str: str) -> DoctorCheckResult:
                 dirnames.clear()
                 continue
 
-            if (dirpath / ".gitignore").is_file():
+            if ps.respect_gitignore and (dirpath / ".gitignore").is_file():
                 gitignore_dirs.append(str(rel_dir))
 
             for fname in filenames:
@@ -494,7 +499,9 @@ async def _check_file_walk(project_root_str: str) -> DoctorCheckResult:
     details = [f"Total matched files: {total}"]
     for ext, count in sorted(counts_by_ext.items(), key=lambda x: -x[1]):
         details.append(f"  {ext}: {count}")
-    if gitignore_dirs:
+    if not ps.respect_gitignore:
+        details.append(".gitignore rules are off (respect_gitignore: false)")
+    elif gitignore_dirs:
         details.append(f"Loaded .gitignore from: {', '.join(gitignore_dirs)}")
 
     return DoctorCheckResult(name="File Walk", ok=True, details=details, errors=[])

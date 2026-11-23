@@ -909,3 +909,30 @@ def test_project_settings_parses_human_readable_max_file_size(tmp_path: Path) ->
     path = save_project_settings(tmp_path, ProjectSettings())
     path.write_text(path.read_text() + "\nmax_file_size: 500KB\n")
     assert load_project_settings(tmp_path).max_file_size == 500 * 1024
+
+
+def test_project_settings_respect_gitignore_defaults_to_true(tmp_path: Path) -> None:
+    """The default stays out of settings.yml, and a file without the key keeps it on."""
+    path = save_project_settings(tmp_path, ProjectSettings())
+    assert "respect_gitignore" not in path.read_text()
+    assert load_project_settings(tmp_path).respect_gitignore is True
+
+
+def test_project_settings_round_trip_respect_gitignore_false(tmp_path: Path) -> None:
+    path = save_project_settings(tmp_path, ProjectSettings())
+    path.write_text(path.read_text() + "\nrespect_gitignore: false\n")
+    loaded = load_project_settings(tmp_path)
+    assert loaded.respect_gitignore is False
+
+    save_project_settings(tmp_path, loaded)
+    assert load_project_settings(tmp_path).respect_gitignore is False
+
+
+@pytest.mark.parametrize("yaml_value", ["'false'", "0", "null"])
+def test_project_settings_rejects_non_boolean_respect_gitignore(
+    tmp_path: Path, yaml_value: str
+) -> None:
+    path = save_project_settings(tmp_path, ProjectSettings())
+    path.write_text(path.read_text() + f"\nrespect_gitignore: {yaml_value}\n")
+    with pytest.raises(ValueError, match="respect_gitignore must be a boolean"):
+        load_project_settings(tmp_path)

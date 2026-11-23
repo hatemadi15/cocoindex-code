@@ -421,3 +421,27 @@ async def test_search_failure_reports_daemon_side_traceback() -> None:
     # The daemon-side frames, not just the exception text.
     assert "_search_with_wait" in error.traceback
     assert "in search" in error.traceback
+
+
+async def test_doctor_file_walk_follows_respect_gitignore(tmp_path: Path) -> None:
+    """`ccc doctor` previews the files the indexer would take, so it counts
+    gitignored files once `respect_gitignore` is off and says the rules are off."""
+    from cocoindex_code.daemon import _check_file_walk
+    from cocoindex_code.settings import ProjectSettings
+
+    (tmp_path / ".gitignore").write_text("ignored.py\n")
+    (tmp_path / "kept.py").write_text("x = 1\n")
+    (tmp_path / "ignored.py").write_text("x = 2\n")
+    settings = ProjectSettings(include_patterns=["**/*.py"], exclude_patterns=[])
+
+    save_project_settings(tmp_path, settings)
+    on = await _check_file_walk(str(tmp_path))
+    assert "Total matched files: 1" in on.details
+    assert "Loaded .gitignore from: ." in on.details
+
+    settings.respect_gitignore = False
+    save_project_settings(tmp_path, settings)
+    off = await _check_file_walk(str(tmp_path))
+    assert "Total matched files: 2" in off.details
+    assert ".gitignore rules are off (respect_gitignore: false)" in off.details
+    assert not any(d.startswith("Loaded .gitignore") for d in off.details)

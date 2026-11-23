@@ -168,17 +168,19 @@ def build_matcher(
     included_patterns: list[str],
     excluded_patterns: list[str],
     max_file_size: int | None = None,
+    *,
+    respect_gitignore: bool = True,
 ) -> FilePathMatcher:
-    """Build the project's file matcher: include/exclude globs plus nested
-    ``.gitignore`` awareness anchored at ``project_root``, and an optional
-    ``max_file_size`` cap in bytes."""
-    base_matcher = PatternFilePathMatcher(
+    """Build the project's file matcher: include/exclude globs, nested
+    ``.gitignore`` awareness anchored at ``project_root`` unless
+    ``respect_gitignore`` is false, and an optional ``max_file_size`` cap in
+    bytes."""
+    matcher: FilePathMatcher = PatternFilePathMatcher(
         included_patterns=included_patterns,
         excluded_patterns=excluded_patterns,
     )
-    matcher: FilePathMatcher = GitignoreAwareMatcher(
-        base_matcher, load_gitignore_spec(project_root), project_root
-    )
+    if respect_gitignore:
+        matcher = GitignoreAwareMatcher(matcher, load_gitignore_spec(project_root), project_root)
     if max_file_size is not None:
         matcher = SizeLimitedMatcher(matcher, project_root, max_file_size)
     return matcher

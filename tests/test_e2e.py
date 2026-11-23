@@ -309,6 +309,17 @@ def test_session_reset_then_full_reinit(e2e_project: Path) -> None:
     assert "main.py" in result.output
 
 
+def _indexed_file_paths(project_dir: Path) -> set[str]:
+    """Paths of the files that have chunks in the project's index."""
+    db_path = project_dir / ".cocoindex_code" / "target_sqlite.db"
+    conn = coco_sqlite.connect(str(db_path), load_vec=True)
+    try:
+        with conn.readonly() as db:
+            return {row[0] for row in db.execute("SELECT DISTINCT file_path FROM code_chunks_vec")}
+    finally:
+        conn.close()
+
+
 def test_session_respects_gitignore(e2e_project: Path) -> None:
     """Indexing should skip files ignored by .gitignore while honoring negations."""
     gitignore_path = e2e_project / ".gitignore"
@@ -324,19 +335,40 @@ def test_session_respects_gitignore(e2e_project: Path) -> None:
     result = runner.invoke(app, ["index"], catch_exceptions=False)
     assert result.exit_code == 0, result.output
 
-    db_path = e2e_project / ".cocoindex_code" / "target_sqlite.db"
-    conn = coco_sqlite.connect(str(db_path), load_vec=True)
-    try:
-        with conn.readonly() as db:
-            file_paths = {
-                row[0] for row in db.execute("SELECT DISTINCT file_path FROM code_chunks_vec")
-            }
-    finally:
-        conn.close()
-
+    file_paths = _indexed_file_paths(e2e_project)
     assert "ignored.py" not in file_paths
     assert "ignored_dir/nested.py" not in file_paths
     assert "important.py" in file_paths
+
+
+def test_session_indexes_gitignored_files_when_respect_gitignore_is_off(
+    e2e_project: Path,
+) -> None:
+    """``respect_gitignore: false`` indexes gitignored files; turning it back on
+    drops them from the index on the next run."""
+    (e2e_project / ".gitignore").write_text("ignored.py\nignored_dir/\n")
+    (e2e_project / "ignored.py").write_text("IGNORED_TOKEN = True\n")
+    ignored_dir = e2e_project / "ignored_dir"
+    ignored_dir.mkdir()
+    (ignored_dir / "nested.py").write_text("NESTED_IGNORED = True\n")
+
+    runner.invoke(app, ["init"], catch_exceptions=False)
+    settings_path = e2e_project / ".cocoindex_code" / "settings.yml"
+    default_settings = settings_path.read_text()
+
+    settings_path.write_text(default_settings + "respect_gitignore: false\n")
+    result = runner.invoke(app, ["index"], catch_exceptions=False)
+    assert result.exit_code == 0, result.output
+    file_paths = _indexed_file_paths(e2e_project)
+    assert {"ignored.py", "ignored_dir/nested.py", "main.py"} <= file_paths
+
+    settings_path.write_text(default_settings)
+    result = runner.invoke(app, ["index"], catch_exceptions=False)
+    assert result.exit_code == 0, result.output
+    file_paths = _indexed_file_paths(e2e_project)
+    assert "ignored.py" not in file_paths
+    assert "ignored_dir/nested.py" not in file_paths
+    assert "main.py" in file_paths
 
 
 @pytest.mark.usefixtures("e2e_project")

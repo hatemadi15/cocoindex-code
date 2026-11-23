@@ -161,6 +161,8 @@ class ProjectSettings:
     chunkers: list[ChunkerMapping] = field(default_factory=list)
     #: Files larger than this many bytes are excluded. ``None`` means no limit.
     max_file_size: int | None = None
+    #: Skip files that ``.gitignore`` rules ignore. ``False`` matches them too.
+    respect_gitignore: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -619,6 +621,8 @@ def _project_settings_to_dict(settings: ProjectSettings) -> dict[str, Any]:
     }
     if settings.max_file_size is not None:
         d["max_file_size"] = settings.max_file_size
+    if not settings.respect_gitignore:
+        d["respect_gitignore"] = False
     if settings.language_overrides:
         d["language_overrides"] = [
             {"ext": lo.ext, "lang": lo.lang} for lo in settings.language_overrides
@@ -635,12 +639,16 @@ def _project_settings_from_dict(d: dict[str, Any]) -> ProjectSettings:
     chunkers = [ChunkerMapping(ext=cm["ext"], module=cm["module"]) for cm in d.get("chunkers", [])]
     raw_max_size = d.get("max_file_size")
     max_file_size = None if raw_max_size is None else parse_file_size(raw_max_size)
+    respect_gitignore = d.get("respect_gitignore", True)
+    if not isinstance(respect_gitignore, bool):
+        raise ValueError("respect_gitignore must be a boolean")
     return ProjectSettings(
         include_patterns=d.get("include_patterns", list(DEFAULT_INCLUDED_PATTERNS)),
         exclude_patterns=d.get("exclude_patterns", list(DEFAULT_EXCLUDED_PATTERNS)),
         language_overrides=overrides,
         chunkers=chunkers,
         max_file_size=max_file_size,
+        respect_gitignore=respect_gitignore,
     )
 
 

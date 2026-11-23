@@ -344,6 +344,23 @@ def test_grep_respects_gitignore(tmp_path: Path) -> None:
     assert not any(p.endswith("ignored.py") for p in paths)
 
 
+def test_grep_includes_gitignored_files_when_project_turns_gitignore_off(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".cocoindex_code").mkdir()
+    (tmp_path / ".cocoindex_code" / "settings.yml").write_text(
+        "include_patterns:\n  - '**/*.py'\nrespect_gitignore: false\n"
+    )
+    (tmp_path / ".gitignore").write_text("ignored.py\n")
+    (tmp_path / "kept.py").write_text("def kept(a):\n    return a\n")
+    (tmp_path / "ignored.py").write_text("def ignored(a):\n    return a\n")
+
+    req = g.GrepRequest(pattern=r"def \NAME(\(A*\)):", root=tmp_path)
+    paths = {fm.path for fm in run_grep(req)}
+    assert any(p.endswith("kept.py") for p in paths)
+    assert any(p.endswith("ignored.py") for p in paths)
+
+
 def test_find_git_root(tmp_path: Path) -> None:
     from cocoindex_code.file_walk import find_git_root
 

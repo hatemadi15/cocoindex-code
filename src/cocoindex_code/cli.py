@@ -742,8 +742,8 @@ def grep(
 
     Compiles the pattern per language and matches every supported source file
     under PATH in parallel. Inside an initialized project it honors the project's
-    include/exclude and .gitignore rules; otherwise it scans all supported source
-    files.
+    include/exclude rules and, unless respect_gitignore is false, its .gitignore
+    rules; otherwise it scans all supported source files.
     """
     from . import grep as _grep
 

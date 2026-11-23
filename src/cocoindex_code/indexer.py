@@ -114,7 +114,11 @@ async def indexer_main() -> None:
     )
 
     matcher = build_matcher(
-        project_root, ps.include_patterns, ps.exclude_patterns, ps.max_file_size
+        project_root,
+        ps.include_patterns,
+        ps.exclude_patterns,
+        ps.max_file_size,
+        respect_gitignore=ps.respect_gitignore,
     )
 
     files = localfs.walk_dir(

@@ -334,7 +334,8 @@ Metavariables use the `\` sigil: `\NAME` captures one node, `\(NAME*\)` a run of
 siblings, `\_`/`\*` match anonymously. The pattern is matched per language, so a
 single invocation scans every supported source file (others are skipped). Inside
 an initialized project, `ccc grep` honors the project's include/exclude patterns
-and `.gitignore`; otherwise it scans all supported source files under the path.
+and, unless `respect_gitignore` is off, `.gitignore`; otherwise it scans all
+supported source files under the path.
 
 Results stream to the terminal file-by-file as each match is found (in completion
 order, since files are matched in parallel) rather than all at once at the end.
@@ -625,6 +626,8 @@ exclude_patterns:
 
 max_file_size: 500KB       # skip files larger than this (default: no limit)
 
+respect_gitignore: false   # also index files .gitignore ignores (default: true)
+
 language_overrides:
   - ext: inc               # treat .inc files as PHP
     lang: php
@@ -643,7 +646,14 @@ to enumerate them in `exclude_patterns`. It accepts a plain byte count
 inclusive, and omitting the key indexes files of any size. It applies wherever
 project file matching does, so `ccc grep` skips the same files.
 
-After editing `include_patterns`, `exclude_patterns`, `max_file_size`, or `language_overrides`:
+By default, files that `.gitignore` ignores (at the project root or in a
+subdirectory) are not indexed. Set `respect_gitignore: false` to index them too,
+for example a virtual environment's installed packages. `exclude_patterns` still
+apply: the default `**/.*` skips hidden directories such as `.venv`, so remove or
+narrow it if the files you want live there. The setting applies to `ccc grep`
+and `ccc doctor` too.
+
+After editing `include_patterns`, `exclude_patterns`, `max_file_size`, `respect_gitignore`, or `language_overrides`:
 
 - Run `ccc doctor` to preview which files match.
 - Run `ccc index` or `ccc search --refresh ...` to update the existing index.

@@ -215,6 +215,7 @@ def _iter_targets(req: GrepRequest, compiler: _PatternCompiler) -> Iterator[_Tar
         ps = load_project_settings(project_root)
         included, excluded = ps.include_patterns, ps.exclude_patterns
         max_file_size = ps.max_file_size
+        respect_gitignore = ps.respect_gitignore
         ext_overrides = {f".{lo.ext}": lo.lang for lo in ps.language_overrides}
         base = project_root
     else:
@@ -222,11 +223,14 @@ def _iter_targets(req: GrepRequest, compiler: _PatternCompiler) -> Iterator[_Tar
         excluded = list(DEFAULT_EXCLUDED_PATTERNS)
         ext_overrides = {}
         max_file_size = None
+        respect_gitignore = True
         # Anchor at the enclosing git repo so grepping a subdirectory still honors the
         # repo-root (and intervening) .gitignore; fall back to the target dir itself.
         base = find_git_root(root) or root
 
-    matcher = build_matcher(base, included, excluded, max_file_size)
+    matcher = build_matcher(
+        base, included, excluded, max_file_size, respect_gitignore=respect_gitignore
+    )
     path_filter = (
         PatternFilePathMatcher(included_patterns=[req.path_glob]) if req.path_glob else None
     )
